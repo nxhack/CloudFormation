@@ -1,0 +1,42 @@
+#!/usr/bin/python
+
+import urllib
+import os
+from Cheetah.Template import Template
+from IPy import IP
+
+api_ver = '2011-01-01'
+metadata = None
+
+base_url = 'http://169.254.169.254/%s/meta-data' % api_ver
+my_ip = urllib.urlopen('%s/local-ipv4/' % base_url).read()
+my_fqdn = os.popen("/bin/hostname -f").read().rstrip()
+ip = IP(my_ip)
+my_arpa = ip.reverseName().rstrip('.')
+
+# replace the Split DNS host ip address in /etc/bind/db.myzone
+mp = {'localipv4' : my_ip}
+t = Template(file="/usr/local/etc/bind/templates/zone.tmpl", searchList=[mp])
+
+os.system("rm -f /etc/bind/db.myzone")
+f = open("/etc/bind/db.myzone", "w")
+f.write('%s' %(t))
+f.close()
+
+# replace the Split DNS host ip address in /etc/bind/db.myarpa
+mp = {'fqdn' : my_fqdn}
+t = Template(file="/usr/local/etc/bind/templates/arpa.tmpl", searchList=[mp])
+
+os.system("rm -f /etc/bind/db.myarpa")
+f = open("/etc/bind/db.myarpa", "w")
+f.write('%s' %(t))
+f.close()
+
+# replace the Split DNS host ip address in /etc/bind/myzone.conf
+mp = {'fqdn' : my_fqdn, 'arpa' : my_arpa}
+t = Template(file="/usr/local/etc/bind/templates/conf.tmpl", searchList=[mp])
+
+os.system("rm -f /etc/bind/myzone.conf")
+f = open("/etc/bind/myzone.conf", "w")
+f.write('%s' %(t))
+f.close()

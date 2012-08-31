@@ -1,0 +1,22 @@
+#!/usr/bin/python
+
+import urllib
+import os
+from Cheetah.Template import Template
+
+api_ver = '2011-01-01'
+metadata = None
+
+base_url = 'http://169.254.169.254/%s/meta-data' % api_ver
+my_ip = urllib.urlopen('%s/local-ipv4/' % base_url).read()
+my_fqdn = os.popen("/bin/hostname -f").read().rstrip()
+my_hostname = os.popen("/bin/hostname -s").read().rstrip()
+
+# replace the ubuntu hostname in /etc/hosts
+mp = {'localipv4' : my_ip, 'hostname' : my_hostname, 'fqdn' : my_fqdn}
+t = Template(file="/usr/local/etc/bind/templates/hosts.tmpl", searchList=[mp])
+
+os.system("rm -f /etc/hosts")
+f = open("/etc/hosts", "w")
+f.write('%s' %(t))
+f.close()

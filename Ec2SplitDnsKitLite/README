@@ -1,0 +1,6 @@
+Require packages:
+	bind9
+	python-ipy
+
+Licence:
+	GPL-3

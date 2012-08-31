@@ -1,0 +1,321 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "WordPress 3 Japanese version on ubuntu 12.04 LTS (Precise Pangolin) EBS-backed Instance All-in-One template",
+
+  "Parameters": {
+    "KeyName": {
+      "Type": "String",
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access into the WordPress web server"
+    },
+    "MyHostName": {
+      "Default": "www",
+      "Type": "String",
+      "Description": "Server hostname"
+    },
+    "MyDomainName": {
+      "Default": "example.com",
+      "Type": "String",
+      "Description": "Server domain name"
+    },
+    "MySQLrootPwd": {
+      "Default": "admin",
+      "NoEcho": "true",
+      "Description" : "MySQL root password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "41",
+      "AllowedPattern" : "[a-zA-Z0-9]*",
+      "ConstraintDescription" : "must contain only alphanumeric characters."
+    },
+    "WordPressDBName": {
+      "Default": "wordpress",
+      "Description" : "The WordPress database name",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+    "PhpMyAdminPwd": {
+      "Default": "padmin",
+      "NoEcho": "true",
+      "Description" : "phpMyAdmin password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "41",
+      "AllowedPattern" : "[a-zA-Z0-9]*",
+      "ConstraintDescription" : "must contain only alphanumeric characters."
+    },
+    "InstanceType": {
+      "Default": "t1.micro",
+      "Description" : "EC2 instance type, e.g. m1.small, m1.large, etc",
+      "Type": "String",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+    "WebServerPort": {
+      "Default": "80",
+      "Type": "String",
+      "Description" : "TCP/IP port for the WordPress web server"
+    }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
+      "m1.small"    : { "Arch" : "64" },
+      "m1.medium"   : { "Arch" : "64" },
+      "m1.large"    : { "Arch" : "64" },
+      "m1.xlarge"   : { "Arch" : "64" },
+      "m2.xlarge"   : { "Arch" : "64" },
+      "m2.2xlarge"  : { "Arch" : "64" },
+      "m2.4xlarge"  : { "Arch" : "64" },
+      "c1.medium"   : { "Arch" : "64" },
+      "c1.xlarge"   : { "Arch" : "64" },
+      "cc1.4xlarge" : { "Arch" : "64HVM" },
+      "cc2.8xlarge" : { "Arch" : "64HVM" },
+      "cg1.4xlarge" : { "Arch" : "64HVM" }
+    },
+    "AWSRegionArch2AMI" : {
+      "us-west-2" : { "32" : "ami-1add532a", "64" : "ami-1cdd532c", "64HVM" : "ami-cada54fa" },
+      "us-west-1" : { "32" : "ami-d50c2890", "64" : "ami-d70c2892", "64HVM" : "NOT_YET_SUPPORTED" },
+      "us-east-1" : { "32" : "ami-057bcf6c", "64" : "ami-137bcf7a", "64HVM" : "ami-eb7bcf82" },
+      "sa-east-1" : { "32" : "ami-32845d2f", "64" : "ami-2e845d33", "64HVM" : "NOT_YET_SUPPORTED" },
+      "eu-west-1" : { "32" : "ami-d1595fa5", "64" : "ami-db595faf", "64HVM" : "ami-c5595fb1" },
+      "ap-southeast-1" : { "32" : "ami-e4db9ab6", "64" : "ami-eadb9ab8", "64HVM" : "NOT_YET_SUPPORTED" },
+      "ap-northeast-1" : { "32" : "ami-bc47fabd", "64" : "ami-c047fac1", "64HVM" : "NOT_YET_SUPPORTED" }
+    }
+  },
+
+  "Resources" : {
+    "Ec2Instance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "KeyName" : { "Ref" : "KeyName" },
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
+            "#!/bin/bash -ex","\n",
+            "echo 'Asia/Tokyo' > /etc/timezone","\n",
+            "dpkg-reconfigure --frontend noninteractive tzdata","\n",
+            "service rsyslog restart","\n",
+            "service cron restart","\n",
+            "aptitude update","\n",
+            "aptitude -y safe-upgrade","\n",
+            "aptitude -y install bind9","\n",
+            "aptitude install python-ipy","\n",
+            "cat <<EOF | base64 -d > /tmp/Ec2SplitDnsKitLite.tar.bz2","\n",
+            "QlpoOTFBWSZTWRjTy5MABr//1d6wAQB+5///f+/eSv////pQEAACAIIAIgAIYAwfdLbQ1QZVRQAm","\n",
+            "gagUBQAoAAAaII0AptqmxQPUA0A0GgADQGgGgADIOGhoyaNGjTQyMhhAGQAyDTQAAMgZAEkSYgQT","\n",
+            "1TeplJ7Rpqeppqfik8k9NMSA8pkwIwjQPUADhoaMmjRo00MjIYQBkAMg00AADIGQDhoaMmjRo00M","\n",
+            "jIYQBkAMg00AADIGQBIkEyCACaA0QjSM9FR+qHqNDQ0NHkgaaPUNAe1T5/cAff+tyf6WEpdvwYd6","\n",
+            "XmhhMVgDYiGhpDVoBCzxlp4G0whGOkbTLLEAIzGAZDNGEHjQEOsHInDIk5Ti0rvEqgbSYAYgDBIZ","\n",
+            "AiIgWQjmA2QLMgD832UA/PNeqTPaMVPjk6Ti0QGGGYPoKiEGZHbq1fJYNHru7NZ6jgNB+o+HhQFH","\n",
+            "502Fm5pSBRosGoJKQ5YJQE1K0llwrYcoYAglV7KsxVFmNBbW2G5ybBXIz/1xx/Qd5Yz98EMui7GC","\n",
+            "14f2sDF9xSp9B7fvnOIXHfpRhO47/EDutgB1Qi/+UXAGuDCv1FmT7hKxrYcPCEfs6o7d3gcwP5ii","\n",
+            "ZmY/lLhiReL9G229/FI9Ves+09IlKbUv1/8UwXU+qWKL9gco7jLklqgufh0MA3xuDeaqi7yDkd30","\n",
+            "SxRhKpKfbpZ1Kky34SDu3QYF0YlgsX+vPu7jQ9IWZAJF0+yWzucQgv6kyg2+x445djFhiDJ+gJmN","\n",
+            "hGH0PlPtvTvHEYcaEJYOhV/WrypzqQuMGCdSIILFNyq5+HkHkrN5+lVCwuJ1BRxNac8OiRNbiQ3q","\n",
+            "oUXmgt2qBGCdewJrdE8XnXZ12TxO0It7B7N7C1pmeZ2mrzkp643ym5GMlhHXx4X2Wv9MSxmcTKOP","\n",
+            "LTYy0W/qkfoMop6GYfQuh2U7SLZX7wcHVxOnIMPkDbbTzCMOezqde3nH6fhpqyS0Bh6pI/+a9WED","\n",
+            "AOkx+sDlAHqLzNDIg5BHRafA1C+l4r1GDK9nKZJLkFwg+EAzoN3TBHVyA5YrmPgG4HKDBCtlmCvO","\n",
+            "RVAX0cVCMUKdQ7SfjbUxAspC2ENb4Mwc18mbWuI8GPORyCYrW+muhdVB7Iqxhqe6cL8DClZ0C70K","\n",
+            "EUoSfx4TixG90dv6Ub4zLEdL5GLwwmkgpknH6QgDtEG+B/D7A6bQ19o/2/GsjACI4LyR0iAvAUG8","\n",
+            "ZNxCY4PdZVL4wXaDVsY2AzLnHd8iyqZXVaaFvkDQCY0RMoB12Fas2HmXGMYz0BkDwVVdZWTgyBmQ","\n",
+            "qmV8Cbbbf9hij7cblMEjx2eWXlISDc0Hs4DOp93wQqL2sALHyPAaCSQElPTTKTHD7Oij2+z8Iw5w","\n",
+            "BWywABerFm4ZY+0E4JqhOkzgA0YLdANGCpydhBziwvpZd8uWBabOVDsvYlIqFSXcvbz31qw2oPuM","\n",
+            "F98kq7372v5NmO7UGe28BRA5TJSSzJGFb666WhCDwKfQ0YDmXbN8Z6AA/vMVgq8LmJqM0YMwWWfx","\n",
+            "IokyUPTs1RxqjOptMNd9KIuDMxhZLA54CzyWGsAnNFMSO2cZ+uIMMOGWzQ1BTQyrqgLPN11XEZ/E","\n",
+            "NgMoYtK9zAiyCaC9yCsgwSIxRYxSk1g7RGbQ59HaoAMUBCTBO4h1u4cqXxzWtKhhjnibkmWSZSsi","\n",
+            "PE0Ssgll+rBKhKEQ2LEKVikqKjtqQQgDBKIbMHg5shIg6ZL3WCdUGzj171KVyoJqQpwB25HMXJS5","\n",
+            "DDHX5OMa5oNnfJAwQKk17ToIQobae1oZqJS0mMJUTetvFE3RHNMvltiFkDlANhEweI665PMB266Q","\n",
+            "VoHaMhZI4gADZ1UTXDrf11N24/5/6/g/7CYLzKx73SqNtSA0gH7nr3uoMoBZvq23sQMOh1wWo/Eo","\n",
+            "VA/1P1zcw89K3GNCUiUEHfAJl0A8YyXc94c4cIrFE1bBLbD+wyAFL5R2JpwcZiDnQQ8UPP0T8p6A","\n",
+            "Zt0434AAlSYUWHhK+pMmY90vISICLNo63dhL7WCJ6yqsZqY3JGVgDb1fCVumtbt/qwlAYGNhjALt","\n",
+            "vcFMkeXfz9jr0ayiRdUbwcAjxNpIeYpIDYfOh0XA53rSm/M8cgIPP9XnXobgt3r0OyEYsRUEm9wS","\n",
+            "eBBrSKEWyOoAc8/FZrQi+w36Jej0/JxhowmhBZnuXo2jALKsREIMiFwokzaql2iBtsd0QEZNCJGB","\n",
+            "iXAkC3lrSlZduhjhPG5xghkQGJslHzEaMrzfudWjBBlmab+yZKU5zmxlCi8BqOGEj2kpNKIq9c6t","\n",
+            "TR4OeJbCbt5eBLN4t5rxfTVOKrLMJBEBnAO+N5irqsFWWLsS8LYhe6LIYpEP5Qcz5zlqla915WRZ","\n",
+            "cxLixlXSay6G01cqA+UBkD4L0EFORJ4V8dTS2QTSzfQKc4Kt5Fk1tHMY5xChrKMs6QkeU905xjOU","\n",
+            "5tBPUGhVgcBnXCyYVDaQc0Il+U3lu917oPA4z8w6h2HD5RBFKDVAYmFwuvg1L0YWvgsqDR+wGbmh","\n",
+            "TU49T6x/YohlTFaY3RmUPeOUTDmeC8JjID2gA/BCkiBo9Go+JBjthv3NVnC60TaYtx5LfPhH/nbh","\n",
+            "SqKkewNZxMvGyIP9PLH3Z84wA7dFfhWaowUwou4Gjom0sAoWUQSRNzLWYMc1yzSmjFakqyy8irgc","\n",
+            "cCkjAMFTZvXuNNxiaxu/AGB4JgH/oBoEwCdtRniE+3igCZjEETSkevlsOxg1oYQ5BIiSUhVGgPR1","\n",
+            "5Mhw0yIRz5cNWoxAybDID0rh9A4HUI9n5+/UhFBbQZtGs918BPHEmM8zqT4PI2BiHeQtKznQJrfE","\n",
+            "QGcCJZXCZIcagOLAbA49lPfQoG48iMqqQfiFhGiAqWSwysWbGm2dkHEDIKl33lwYyAGYwE5RMJzQ","\n",
+            "RKYpJwSgUZGSYm3doix+bOhey/F5SGxkCQ9+QB9eFJHHkHKl6JKqV2DaU8KxQ2fEArLK92NpfbRE","\n",
+            "Wpu/eAPxALBkcDNi9O5bBIxZqJ4Fb3u6d2tUzEMRLkKbsS6fCMq2SJpHG1YjXr7NDZh7liFRrva8","\n",
+            "vHeKTPRTlLYywDNJmsauGIbwA04jO8Ve83bkrLFbAaDcaRCGlCkFEHS4RlkMRl31D4KwiYWcIDFn","\n",
+            "yQjioSpnG6SqZIGl6HWOILJamagDCBOTIYNvuJsIKyotsASJupJyiREakZHup2ESho1SzNXiglax","\n",
+            "iotrzJm0OJ9gbRH5AqHQ27FkdGdSZwSNEBrC6IY2wTNQ33M95OHzoSg7GzgUGO7kpEYMrVWwlk/2","\n",
+            "hRVvGJBaUlNhUhLVgEKhUA1dmPN8NMwdmHSlgrTBUviVwIY2ajfBIoN4hQlGIoSIMpMNs5kkEgvQ","\n",
+            "AseATVSojSGEAYBnvhhnnnw0t2QXDNGSsirgvERVwTt7wxpgQQwhRi4BsZUwupgwA0FgSYaECDCS","\n",
+            "SJhQGDAJTDcgaIWZVwyqByMEBrY1ahXZR7prWNNLhBv3iNBFgHtx4qSNSYbWHkqeFO842aeAY6l9","\n",
+            "q+N+FDvwufUviFA3DO0V/mAYIOWrmL+XtOd9hg9CYxoOOJWCPMPSRrKnKN+BuDC+Wbx7IGAH8ZLM","\n",
+            "28oJbq2N5BxEGvYLaQE8lQDTh4+fvhLcZNoXUx1PK1H4OD7ASP/xdyRThQkBjTy5MA==","\n",
+            "EOF","\n",
+            "tar xfj /tmp/Ec2SplitDnsKitLite.tar.bz2 -C /tmp/","\n",
+            "mkdir -p /usr/local/etc/init","\n",
+            "mkdir -p /usr/local/etc/bind/templates","\n",
+            "cp /tmp/Ec2SplitDnsKitLite/init/ec2-set-hosts /usr/local/etc/init/","\n",
+            "cp /tmp/Ec2SplitDnsKitLite/init/ec2-set-dns-zone /usr/local/etc/init/","\n",
+            "cp /tmp/Ec2SplitDnsKitLite/templates/* /usr/local/etc/bind/templates/","\n",
+            "mv /etc/bind/named.conf.local /etc/bind/named.conf.local.deb-orig","\n",
+            "cp /tmp/Ec2SplitDnsKitLite/bind/named.conf.local /etc/bind/","\n",
+            "mv /etc/bind/named.conf.options /etc/bind/named.conf.options.deb-orig","\n",
+            "cp /tmp/Ec2SplitDnsKitLite/bind/named.conf.options /etc/bind/","\n",
+            "chmod +x /usr/local/etc/init/ec2-set-hosts","\n",
+            "chmod +x /usr/local/etc/init/ec2-set-dns-zone","\n",
+            "ln -s /usr/local/etc/init/ec2-set-hosts /etc/rc2.d/S12ec2-set-hosts","\n",
+            "ln -s /usr/local/etc/init/ec2-set-dns-zone /etc/rc2.d/S13ec2-set-dns-zone","\n",
+            "echo ", {"Ref" : "MyHostName"}, " > /etc/hostname","\n",
+            "/bin/hostname -F /etc/hostname","\n",
+            "mv /etc/dhcp/dhclient.conf /etc/dhcp/dhclient.conf.deb-orig","\n",
+            "sed -e 's/__DOMAIN__/", {"Ref" : "MyDomainName"}, "/g' /tmp/Ec2SplitDnsKitLite/dhcp3/dhclient.conf.tmpl > /etc/dhcp/dhclient.conf","\n",
+            "sed -e 's/__DOMAIN__/", {"Ref" : "MyDomainName"}, "/g' /tmp/Ec2SplitDnsKitLite/dhcp3/resolv.conf.tmpl > /etc/resolvconf/resolv.conf.d/base","\n",
+            "/sbin/resolvconf -u","\n",
+            "/usr/local/etc/init/ec2-set-dns-zone","\n",
+            "/etc/init.d/bind9 restart","\n",
+            "/usr/local/etc/init/ec2-set-hosts","\n",
+            "service rsyslog restart","\n",
+            "service cron restart","\n",
+            "echo mysql-server-5.5 mysql-server/root_password password ", {"Ref" : "MySQLrootPwd"}, " | debconf-set-selections","\n",
+            "echo mysql-server-5.5 mysql-server/root_password seen true | debconf-set-selections","\n",
+            "echo mysql-server-5.5 mysql-server/root_password_again password ", {"Ref" : "MySQLrootPwd"}, " | debconf-set-selections","\n",
+            "echo mysql-server-5.5 mysql-server/root_password_again seen true | debconf-set-selections","\n",
+            "echo mysql-server-5.5 mysql-server/start_on_boot boolean true | debconf-set-selections","\n",
+            "aptitude -y install mysql-server","\n",
+            "aptitude -y install mysql-client","\n",
+            "aptitude -y install wordpress","\n",
+            "a2enmod rewrite","\n",
+            "/etc/init.d/apache2 stop","\n",
+            "/bin/bash /usr/share/doc/wordpress/examples/setup-mysql -n wordpress localhost","\n",
+            "mv /etc/wordpress /etc/wordpress-cfn","\n",
+            "mv /usr/share/doc/wordpress /etc/wordpress-cfn/doc","\n",
+            "apt-get -y remove wordpress","\n",
+            "aptitude keep-all","\n",
+            "aptitude -y purge wordpress","\n",
+	    "chgrp www-data /srv/www","\n",
+            "rm /srv/www/localhost","\n",
+            "rm -rf /srv/www/wp-uploads","\n",
+            "cat /etc/wordpress-cfn/config-localhost.php | fgrep -v '/localhost' > /etc/wordpress-cfn/config-cfn.php","\n",
+            "chmod 640 /etc/wordpress-cfn/config-cfn.php","\n",
+            "chgrp www-data /etc/wordpress-cfn/config-cfn.php","\n",
+            "mv /etc/wordpress-cfn/wp-config.php /etc/wordpress-cfn/wp-config.php.deb-orig","\n",
+            "cat <<EOF > /etc/wordpress-cfn/wp-config.php","\n",
+            "<?php","\n",
+            "require_once('/etc/wordpress-cfn/config-cfn.php');","\n",
+            "\n",
+            "define('WP_CORE_UPDATE', true);","\n",
+            "define('DB_CHARSET', 'utf8');","\n",
+            "define('DB_COLLATE', '');","\n",
+            "\n",
+            "define('ABSPATH', '/srv/www/blog/');","\n",
+            "define('WP_DEBUG', false);","\n",
+            "define('WPLANG', 'ja');","\n",
+            "\n",
+            "require_once(ABSPATH . 'wp-settings.php');","\n",
+            "?>","\n",
+            "EOF","\n",
+            "cat <<EOF > /etc/wordpress-cfn/apache2.conf","\n",
+            "Alias /blog /srv/www/blog","\n",
+            "","\n",
+            "<Directory /srv/www/blog>","\n",
+            "\tOptions +FollowSymLinks","\n",
+            "\tAllowOverride FileInfo","\n",
+            "\tDirectoryIndex index.php","\n",
+            "</Directory>","\n",
+            "EOF","\n",
+            "wget -qO - http://ja.wordpress.org/latest-ja.tar.gz > /tmp/wordpress-latest-ja.tar.gz","\n",
+            "tar xfz /tmp/wordpress-latest-ja.tar.gz -C /srv/www","\n",
+            "mv /srv/www/wordpress /srv/www/blog","\n",
+            "chown -R www-data:www-data /srv/www/blog","\n",
+            "ln -s /etc/wordpress-cfn/wp-config.php /srv/www/blog/","\n",
+            "ln -s /etc/wordpress-cfn/apache2.conf /etc/apache2/conf.d/wordpress.conf","\n",
+            "echo phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2 | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/reconfigure-webserver seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/dbconfig-install boolean true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/dbconfig-install seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/db/app-user string phpmyadmin | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/db/app-user seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/db/dbname string phpmyadmin | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/db/dbname seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/method multiselect 'unix socket' | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/method seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/admin-user string root | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/admin-user seen true | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/admin-pass password ", {"Ref" : "MySQLrootPwd"}, " | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/mysql/app-pass password ", {"Ref" : "PhpMyAdminPwd"}, " | debconf-set-selections","\n",
+            "echo phpmyadmin phpmyadmin/app-password-confirm password ", {"Ref" : "PhpMyAdminPwd"}, " | debconf-set-selections","\n",
+            "aptitude -y install phpmyadmin","\n",
+            "cat <<EOF > /etc/phpmyadmin/apache2-auth.conf","\n",
+            "<Directory /usr/share/phpmyadmin>","\n",
+            "\t<IfModule mod_authn_file.c>","\n",
+            "\tAuthType Basic","\n",
+            "\tAuthName \"phpMyAdmin auth\"","\n",
+            "\tAuthUserFile /etc/phpmyadmin/htpasswd.admin","\n",
+            "\t</IfModule>","\n",
+            "\tRequire valid-user","\n",
+            "</Directory>","\n",
+            "EOF","\n",
+            "cp /etc/phpmyadmin/htpasswd.setup /etc/phpmyadmin/htpasswd.admin","\n",
+            "chgrp www-data /etc/phpmyadmin/htpasswd.admin","\n",
+            "ln -s /etc/phpmyadmin/apache2-auth.conf /etc/apache2/conf.d/phpmyadmin-auth.conf","\n",
+            "echo postfix postfix/main_mailer_type select Internet Site | debconf-set-selections","\n",
+            "echo postfix postfix/main_mailer_type seen true | debconf-set-selections","\n",
+            "echo postfix postfix/mailname string ", {"Ref" : "MyHostName"}, ".", {"Ref" : "MyDomainName"}, " | debconf-set-selections","\n",
+            "echo postfix postfix/mailname seen true | debconf-set-selections","\n",
+            "aptitude -y install postfix","\n",
+            "/etc/init.d/apache2 start","\n" ]]}}
+      }
+    },
+
+    "InstanceSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "HTTP and SSH access",
+        "SecurityGroupIngress" : [ {
+            "IpProtocol" : "tcp",
+            "FromPort" : "22", "ToPort" : "22",
+            "CidrIp" : "0.0.0.0/0"
+          },{
+            "IpProtocol": "tcp",
+            "FromPort": { "Ref": "WebServerPort" },
+            "ToPort": { "Ref": "WebServerPort" },
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "WordPress": {
+      "Value": { "Fn::Join": [ "", [ "http://", { "Fn::GetAtt": [ "Ec2Instance", "PublicIp" ] }, "/blog/" ]]},
+      "Description" : "URL of the WordPress website"
+    },
+    "phpMyAdmin": {
+      "Value": { "Fn::Join": [ "", [ "http://", { "Fn::GetAtt": [ "Ec2Instance", "PublicIp" ] }, "/phpmyadmin/" ]]},
+      "Description" : "URL of the phpMyAdmin.   *** Requires authorization by default. You can manage usernames and passwords with htpasswd command in the /etc/phpmyadmin/htpasswd.admin file. ***"
+    },
+    "InstanceId" : {
+      "Value" : { "Ref" : "Ec2Instance" },
+      "Description" : "InstanceId of the newly created EC2 instance"
+    },
+    "AvailabilityZone" : {
+      "Value" : { "Fn::GetAtt" : [ "Ec2Instance", "AvailabilityZone" ] },
+      "Description" : "Availability Zone of the newly created EC2 instance"
+    },
+    "PublicIP" : {
+      "Value" : { "Fn::GetAtt" : [ "Ec2Instance", "PublicIp" ] },
+      "Description" : "Public IP address of the newly created EC2 instance"
+    },
+    "README" : {
+      "Value" : " ",
+      "Description" : "|||| Enable phpMyAdmin : sudo htpasswd /etc/phpmyadmin/htpasswd.admin admin  ||||  Change MySQL root passowrd : sudo dpkg-reconfigure mysql-server-5.5  ||||  Change phpMyAdmin passowrd : sudo dpkg-reconfigure phpmyadmin  ||||"
+    }
+  }
+}
