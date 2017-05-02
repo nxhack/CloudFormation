@@ -1,0 +1,11 @@
+[Unit]
+Description=run ec2 set hosts file during boot
+After=network.target
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/usr/local/etc/init/ec2-set-hosts
+
+[Install]
+WantedBy=multi-user.target
